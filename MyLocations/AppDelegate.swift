@@ -7,15 +7,44 @@
 //
 
 import UIKit
+import CoreData
+
+let MyManagedObjectContextSaveDidFailNotification = "MyManagedObjectContextSaveDidFailNotification"
+
+//----------------------------------------------------------------------------------------------
+// Define a global function for handling fatal core data errors
+//----------------------------------------------------------------------------------------------
+func fatalCoreDataError(error: NSError?) {
+    if let error = error {
+        println("*** Fatal Error: \(error), \(error.userInfo)")
+    }
+    NSNotificationCenter.defaultCenter().postNotificationName(MyManagedObjectContextSaveDidFailNotification, object: error)
+}
+
+
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
 
-
+    //----------------------------------------------------------------------------------------------
+    // Here pass along managedObjectContext to other vc's
+    //----------------------------------------------------------------------------------------------
     func application(application: UIApplication, didFinishLaunchingWithOptions launchOptions: [NSObject: AnyObject]?) -> Bool {
-        // Override point for customization after application launch.
+        // Get a reference to CurrentLocationViewController
+        let tabBarController = window!.rootViewController as! UITabBarController
+        
+        if let tabBarViewControllers = tabBarController.viewControllers {
+            
+            let currentLocationViewController = tabBarViewControllers[0] as! CurrentLocationViewController
+            currentLocationViewController.managedObjectContext = managedObjectContext
+            
+            let navigationController = tabBarViewControllers[1] as! UINavigationController
+            let locationsViewController = navigationController.viewControllers[0] as! LocationsViewController
+            locationsViewController.managedObjectContext = managedObjectContext
+        }
+        listenForFatalCoreDataNotifications() // Register notification handler with NSNotificationCenter
         return true
     }
 
@@ -39,6 +68,78 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func applicationWillTerminate(application: UIApplication) {
         // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
+    }
+    
+    // MARK: CORE DATA
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+    lazy var managedObjectContext: NSManagedObjectContext = { // Create NSManagedObjectContext object
+        // Find the url of the Core Data model we made
+        if let modelURL = NSBundle.mainBundle().URLForResource("DataModel", withExtension: "momd") {
+            
+            // Create object representing data model during runtime
+            if let model = NSManagedObjectModel(contentsOfURL: modelURL) {
+                
+                // Create NSPersistentStoreCoordinator object in charge of SQLite db
+                let coordinator = NSPersistentStoreCoordinator(managedObjectModel: model)
+                let urls = NSFileManager.defaultManager().URLsForDirectory(.DocumentDirectory, inDomains: .UserDomainMask)
+                let documentsDirectory = urls[0] as! NSURL
+                let storeURL = documentsDirectory.URLByAppendingPathComponent("DataStore.sqlite")
+                //println(storeURL)
+                
+                // Add SQLite db to store coordinator
+                var error: NSError?
+                if let store = coordinator.addPersistentStoreWithType(NSSQLiteStoreType, configuration: nil, URL: storeURL, options: nil, error: &error) {
+                    // Create NSManagedObjectContext object and return it
+                    let context = NSManagedObjectContext()
+                    context.persistentStoreCoordinator = coordinator
+                    return context
+                } else {
+                    println("Error adding persistent store at \(storeURL): \(error!)")
+                }
+            } else {
+                println("Error initializing model from: \(modelURL)")
+            }
+        } else {
+            println("Could not find data model in app bundle")
+        }
+        
+        abort()
+    }()
+    
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+    func listenForFatalCoreDataNotifications() {
+        // Tell NSNotificationCenter you want to be notified fail notification is posted
+        NSNotificationCenter.defaultCenter().addObserverForName(MyManagedObjectContextSaveDidFailNotification, object: nil, queue: NSOperationQueue.mainQueue(), usingBlock: {
+            notification in
+            
+            // Create alert, then add action for OK button
+            let alert = UIAlertController(title: "Internal Error", message: "There was a fatal error in the app and it cannot continue.\n\n"
+                + "Press OK to terminate the app. Sorry for the inconvenience.", preferredStyle: .Alert)
+            
+            let action = UIAlertAction(title: "OK", style: .Default) { _ in
+                let exception = NSException(name: NSInternalInconsistencyException, reason: "Fatal Core Data Error", userInfo: nil)
+                exception.raise() // Raise an NSException istead of abort
+            }
+            
+            alert.addAction(action)
+            
+            // Present the alert
+            self.viewControllerForShowingAlert().presentViewController(alert, animated: true, completion: nil)
+        })
+    }
+    
+    //----------------------------------------------------------------------------------------------
+    // Helper method to find a view controller that is visible
+    //----------------------------------------------------------------------------------------------
+    func viewControllerForShowingAlert() -> UIViewController {
+        let rootViewController = self.window!.rootViewController!
+        if let presentedViewController = rootViewController.presentedViewController {
+            return presentedViewController
+        } else {
+            return rootViewController
+        }
     }
 
 
