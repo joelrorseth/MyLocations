@@ -122,6 +122,8 @@ class LocationsViewController: UITableViewController {
         // This method enables swipe-to-delete
         if editingStyle == .Delete {
             let location = fetchedResultsController.objectAtIndexPath(indexPath) as! Location
+            
+            location.removePhotoFile()
             managedObjectContext.deleteObject(location)
             
             var error: NSError?

@@ -11,7 +11,10 @@ import UIKit
 class LocationCell: UITableViewCell {
     @IBOutlet weak var descriptionLabel: UILabel!
     @IBOutlet weak var addressLabel: UILabel!
+    @IBOutlet weak var photoImageView: UIImageView!
     
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
     func configureForLocation(location: Location) {
         
         // Configure description label
@@ -23,9 +26,28 @@ class LocationCell: UITableViewCell {
         
         // Configure address label
         if let placemark = location.placemark {
-            addressLabel.text = "\(placemark.subThoroughfare) \(placemark.thoroughfare)," + "\(placemark.locality)"
+            var text = ""
+            text.addText(placemark.subThoroughfare)
+            text.addText(placemark.thoroughfare, withSeparator: " ")
+            text.addText(placemark.locality, withSeparator: ", ")
+            addressLabel.text = text
         } else {
             addressLabel.text = String(format: "Lat: %.8f, Long: %.8f", location.latitude, location.longitude)
         }
+        
+        photoImageView.image = imageForLocation(location)
+    }
+    
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+    func imageForLocation(location: Location) -> UIImage {
+        if location.hasPhoto {
+            if let image = location.photoImage {
+                // Return the corresponding image
+                return image.resizedImageWithBounds(CGSize(width: 52, height: 52))
+            }
+        }
+        // If none, return empty placeholder image
+        return UIImage()
     }
 }
