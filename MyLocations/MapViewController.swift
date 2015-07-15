@@ -182,6 +182,7 @@ extension MapViewController: MKMapViewDelegate {
                 annotationView.canShowCallout = true
                 annotationView.animatesDrop = false
                 annotationView.pinColor = .Green
+                annotationView.tintColor = UIColor(white: 0.0, alpha: 0.5)
                 
                 // Create DD button using target-action, hook up Touch Up Inside event with a method
                 let rightButton = UIButton.buttonWithType(.DetailDisclosure) as! UIButton
